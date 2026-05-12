@@ -1,0 +1,38 @@
+flowchart LR
+  subgraph Source[Data Source]
+    YT[YouTube Data API v3<br/>/videos?chart=mostPopular]
+  end
+
+  subgraph Extract[Extraction Layer]
+    EVB[EventBridge Schedule<br/>08:00 UTC daily]
+    L[Lambda (Python)<br/>fetch trending videos]
+  end
+
+  subgraph Lake[S3 Data Lake]
+    RAW[(S3: yt-trending-raw<br/>date=YYYY-MM-DD/region=US/videos.json)]
+    PROC[(S3: yt-trending-processed<br/>Parquet partitions)]
+    MAP[(S3: category mapping<br/>categories.json)]
+  end
+
+  subgraph Transform[AWS Glue]
+    C[Glue Crawler<br/>raw schema discovery]
+    J[Glue ETL (PySpark)<br/>flatten + cast + enrich]
+    CAT[Glue Data Catalog]
+  end
+
+  subgraph Query[Athena]
+    ATH[Athena External Table<br/>youtube_analytics.trending_videos]
+  end
+
+  subgraph Viz[Power BI]
+    PBI[Power BI Dashboard<br/>category trends + engagement]
+  end
+
+  EVB --> L -->|REST call| YT
+  L -->|PutObject| RAW
+  RAW --> C --> CAT
+  MAP --> J
+  RAW --> J --> PROC
+  PROC --> CAT
+  CAT --> ATH --> PBI
+
